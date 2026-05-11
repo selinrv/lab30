@@ -3,6 +3,7 @@
 namespace App\Controller\Admin;
 
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Assets;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
@@ -40,6 +41,15 @@ class DashboardController extends AbstractDashboardController
     {
         return Dashboard::new()
             ->setTitle('Public Html');
+    }
+
+    public function configureAssets(): Assets
+    {
+        return Assets::new()
+            ->addCssFile('vendor/flasher/flasher.min.css')
+            ->addCssFile('vendor/flasher/themes/ios/ios.min.css')
+            ->addJsFile('vendor/flasher/flasher.min.js')
+            ->addJsFile('vendor/flasher/themes/ios/ios.min.js');
     }
 
     public function configureMenuItems(): iterable

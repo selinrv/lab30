@@ -1,0 +1,61 @@
+flasher:
+    # Default notification library (e.g., 'flasher', 'toastr', 'noty', 'notyf', 'sweetalert')
+
+    default: flasher
+
+    themes:
+        ios:
+            scripts:
+                - '/vendor/flasher/themes/ios/ios.min.js'
+            styles:
+                - '/vendor/flasher/themes/ios/ios.min.css'
+
+    # Path to the main PHPFlasher JavaScript file
+    main_script: '/vendor/flasher/flasher.min.js'
+
+    # Prefix prepended to every flasher asset URL. Useful when the app is
+    # served from a subdirectory (e.g. '/Symfony') or a separate asset host
+    # (e.g. 'https://cdn.example.com'). Leave empty when mounted at the root.
+    public_path: ''
+
+    # List of CSS files to style your notifications
+    styles:
+        - '/vendor/flasher/flasher.min.css'
+
+    # Set global options for all notifications (optional)
+    # options:
+    #     # Time in milliseconds before the notification disappears
+    #     timeout: 5000
+    #     # Where the notification appears on the screen
+    #     position: 'top-right'
+
+    # Automatically inject JavaScript and CSS assets into your HTML pages
+    inject_assets: true
+
+    # Enable message translation using Symfony's translation service
+    translate: true
+
+    # URL patterns to exclude from asset injection and flash_bag conversion
+    excluded_paths:
+        - '/^\/_profiler/'
+        - '/^\/_fragment/'
+
+    # Map Symfony flash message keys to notification types
+    flash_bag:
+        success: ['success']
+        error: ['error', 'danger']
+        warning: ['warning', 'alarm']
+        info: ['info', 'notice', 'alert']
+
+    # Set criteria to filter which notifications are displayed (optional)
+    # filter:
+    #     # Maximum number of notifications to show at once
+    #     limit: 5
+
+    # Define notification presets to simplify notification creation (optional)
+    # presets:
+    #     # Example preset:
+    #     entity_saved:
+    #         type: 'success'
+    #         title: 'Entity saved'
+    #         message: 'Entity saved successfully'

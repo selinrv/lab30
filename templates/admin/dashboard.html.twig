@@ -4,21 +4,40 @@
 
 {% block main %}
     <div class="container mt-4">
-        <h2>Webcam Monitor</h2>
+        <h2>Microstructure monitor</h2>
 
         <div class="card">
             <div class="card-body text-center">
-                <video id="webcam" autoplay playsinline width="640" height="480"
-                       class="border rounded"></video>
-                <canvas id="snapshot" width="640" height="480" class="d-none"></canvas>
+                <div class="position-relative d-inline-block">
+                    <video id="webcam" autoplay playsinline width="800" height="450"
+                           class="border rounded"></video>
+                    <img id="overlay" alt=""
+                         class="position-absolute"
+                         style="top: 10px; right: 10px; width: 100px; pointer-events: none; display: none;" />
+                </div>
+                <canvas id="snapshot" width="800" height="450" class="d-none"></canvas>
 
-                <div class="mt-3">
+                <div class="mt-3 d-flex justify-content-center align-items-center gap-2 flex-wrap">
                     <button class="btn btn-primary" onclick="startCamera()">Start Camera</button>
                     <button class="btn btn-secondary" onclick="takeSnapshot()">Take Snapshot</button>
                     <button class="btn btn-danger" onclick="stopCamera()">Stop</button>
+
+
+                </div>
+                <div class="mt-3 d-flex justify-content-center align-items-center gap-2 flex-wrap">
+                    <label for="magnification" class="ms-3 mb-0">Scale</label>
+                    <select id="magnification" class="form-select" style="width:auto;">
+                        <option value="--">--</option>
+                        <option value="5">x5</option>
+                        <option value="20">x20</option>
+                        <option value="50">x50</option>
+                        <option value="100">x100</option>
+                    </select>
+
+
                 </div>
 
-                <img id="preview" class="mt-3 rounded border" style="display:none; max-width:640px;" />
+                <div id="gallery" class="mt-4 d-flex flex-wrap gap-3 justify-content-center"></div>
             </div>
         </div>
     </div>
@@ -42,13 +61,71 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                const dataUrl = canvas.toDataURL('image/png');
-                const preview = document.getElementById('preview');
-                preview.src = dataUrl;
-                preview.style.display = 'block';
+                const overlay = document.getElementById('overlay');
+                if (overlay.complete && overlay.naturalWidth > 0 && overlay.style.display !== 'none') {
+                    const w = 100;
+                    const h = w * overlay.naturalHeight / overlay.naturalWidth;
+                    const x = canvas.width - 10 - w;
+                    const y = 10;
+                    ctx.drawImage(overlay, x, y, w, h);
+                }
 
-                // Optionally send to Symfony backend:
-                // uploadSnapshot(dataUrl);
+                const dataUrl = canvas.toDataURL('image/png');
+                const magnification = document.getElementById('magnification').value;
+
+                fetch('/admin/snapshot', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: dataUrl, magnification }),
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        appendToGallery(data.filename, dataUrl);
+                        flasher.use('theme.ios').success(data.message);
+
+                    } else {
+                        console.error('Save failed:', data.error);
+                        alert('Save failed: ' + data.error);
+                    }
+                })
+                .catch(err => {
+                    console.error('Save error:', err);
+                    alert('Save error: ' + err.message);
+                });
+            }
+
+            function appendToGallery(filename, dataUrl) {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.width = '200px';
+                card.innerHTML = `
+                    <img class="card-img-top" alt="">
+                    <div class="card-body p-2 text-center">
+                        <small class="d-block text-truncate text-muted" title=""></small>
+                        <button type="button" class="btn btn-sm btn-outline-danger mt-2">Delete</button>
+                    </div>
+                `;
+                card.querySelector('img').src = dataUrl;
+                const label = card.querySelector('small');
+                label.textContent = filename;
+                label.title = filename;
+                card.querySelector('button').addEventListener('click', () => deleteSnapshot(filename, card));
+                document.getElementById('gallery').appendChild(card);
+            }
+
+            function deleteSnapshot(filename, card) {
+                fetch('/admin/snapshot/' + encodeURIComponent(filename), { method: 'DELETE' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.ok) {
+                            card.remove();
+                            flasher.success(data.message);
+                        } else {
+                            alert('Delete failed: ' + (data.error || 'unknown'));
+                        }
+                    })
+                    .catch(err => alert('Delete error: ' + err.message));
             }
 
             function stopCamera() {
@@ -57,6 +134,16 @@
                     document.getElementById('webcam').srcObject = null;
                 }
             }
+
+            function updateOverlay() {
+                const value = document.getElementById('magnification').value;
+                const overlay = document.getElementById('overlay');
+                overlay.src = `/images/overlays/x${value}.png`;
+                overlay.style.display = 'block';
+            }
+
+            document.getElementById('magnification').addEventListener('change', updateOverlay);
+            updateOverlay();
         </script>
     {% endblock %}
 {% endblock %}
