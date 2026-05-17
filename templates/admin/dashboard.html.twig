@@ -12,8 +12,8 @@
                     <video id="webcam" autoplay playsinline width="800" height="450"
                            class="border rounded"></video>
                     <img id="overlay" alt=""
-                         class="position-absolute"
-                         style="top: 10px; right: 10px; width: 100px; pointer-events: none; display: none;" />
+                         class="position-absolute top-0 start-0 w-100 h-100"
+                         style="pointer-events: none; display: none;" />
                 </div>
                 <canvas id="snapshot" width="2720" height="2048" class="d-none"></canvas>
 
@@ -21,6 +21,8 @@
                     <button class="btn btn-primary" onclick="startCamera()">Start Camera</button>
                     <button class="btn btn-secondary" onclick="takeSnapshot()">Take Snapshot</button>
                     <button class="btn btn-danger" onclick="clearSession()">Clear session</button>
+                    <button class="btn btn-success" onclick="downloadSession()">Download ZIP</button>
+                    <button class="btn btn-info" onclick="emailSession()">Send Email</button>
 
 
                 </div>
@@ -46,6 +48,9 @@
                         <option value="50">x50</option>
                         <option value="100">x100</option>
                     </select>
+
+                    <label for="comment" class="ms-3 mb-0">Comment</label>
+                    <input type="text" id="comment" class="form-control" style="width:auto;" />
                 </div>
 
                 <div id="gallery" class="mt-4 d-flex flex-wrap gap-3 justify-content-center"></div>
@@ -115,23 +120,19 @@
 
                 const overlay = document.getElementById('overlay');
                 if (overlay.complete && overlay.naturalWidth > 0 && overlay.style.display !== 'none') {
-                    const w = canvas.width * 0.125;
-                    const h = w * overlay.naturalHeight / overlay.naturalWidth;
-                    const margin = canvas.width * 0.0125;
-                    const x = canvas.width - margin - w;
-                    const y = margin;
-                    ctx.drawImage(overlay, x, y, w, h);
+                    ctx.drawImage(overlay, 0, 0, canvas.width, canvas.height);
                 }
 
                 const dataUrl = canvas.toDataURL('image/png');
                 const magnification = document.getElementById('magnification').value;
                 const alloy = document.getElementById('alloy').value;
                 const position = document.getElementById('position').value;
+                const comment = document.getElementById('comment').value;
 
                 fetch('/admin/snapshot', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: dataUrl, magnification, alloy, position }),
+                    body: JSON.stringify({ image: dataUrl, magnification, alloy, position, comment }),
                 })
                 .then(r => r.json())
                 .then(data => {
@@ -211,6 +212,64 @@
                 if (!confirm('Clear current session? Captured files will remain on disk.')) return;
                 localStorage.removeItem(SESSION_KEY);
                 document.getElementById('gallery').innerHTML = '';
+            }
+
+            function downloadSession() {
+                const filenames = loadSession();
+                if (filenames.length === 0) {
+                    alert('No images in current session.');
+                    return;
+                }
+
+                fetch('/admin/snapshot/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filenames }),
+                })
+                .then(async r => {
+                    if (!r.ok) {
+                        const data = await r.json().catch(() => ({}));
+                        throw new Error(data.error || ('HTTP ' + r.status));
+                    }
+                    const disposition = r.headers.get('Content-Disposition') || '';
+                    const match = disposition.match(/filename="?([^"]+)"?/);
+                    const name = match ? match[1] : 'microstructures.zip';
+                    const blob = await r.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = name;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => alert('Download failed: ' + err.message));
+            }
+
+            function emailSession() {
+                const filenames = loadSession();
+                if (filenames.length === 0) {
+                    alert('No images in current session.');
+                    return;
+                }
+                const email = prompt('Send ZIP archive of ' + filenames.length + ' image(s) to:', '');
+                if (!email) return;
+
+                fetch('/admin/snapshot/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filenames, email }),
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.ok) {
+                        flasher.use('theme.ios').success(data.message);
+                    } else {
+                        alert('Send failed: ' + (data.error || 'unknown'));
+                    }
+                })
+                .catch(err => alert('Send error: ' + err.message));
             }
 
             function restoreSession() {

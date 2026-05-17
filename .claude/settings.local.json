@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php bin/console doctrine:migrations:diff --no-interaction)",
+      "Bash(php bin/console debug:dotenv)",
+      "Bash(php bin/console debug:container --env-var MAILER_DSN)"
+    ]
+  }
+}

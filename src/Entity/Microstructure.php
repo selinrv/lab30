@@ -29,6 +29,9 @@ class Microstructure
     #[ORM\Column(type: 'datetime_immutable')]
     private ?\DateTimeImmutable $date = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $comment = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -90,6 +93,17 @@ class Microstructure
     public function setDate(\DateTimeImmutable $date): static
     {
         $this->date = $date;
+        return $this;
+    }
+
+    public function getComment(): ?string
+    {
+        return $this->comment;
+    }
+
+    public function setComment(?string $comment): static
+    {
+        $this->comment = $comment;
 
         return $this;
     }
