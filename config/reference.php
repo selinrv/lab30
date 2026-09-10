@@ -638,7 +638,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         }>,
  *     },
  *     uid?: bool|array{ // Uid configuration
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *         default_uuid_version?: 7|6|4|1|Param, // Default: 7
  *         name_based_uuid_version?: 5|3|Param, // Default: 5
  *         name_based_uuid_namespace?: scalar|Param|null,
@@ -957,7 +957,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         enabled?: bool|Param, // Default: false
  *     },
  *     html?: bool|array{
- *         enabled?: bool|Param, // Default: false
+ *         enabled?: bool|Param, // Default: true
  *     },
  *     markdown?: bool|array{
  *         enabled?: bool|Param, // Default: false
@@ -1455,6 +1455,48 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     generate_final_classes?: bool|Param, // Default: true
  *     generate_final_entities?: bool|Param, // Default: false
  * }
+ * @psalm-type TwigComponentConfig = array{
+ *     defaults?: array<string, string|array{ // Default: ["__deprecated__use_old_naming_behavior"]
+ *         template_directory?: scalar|Param|null, // Default: "components"
+ *         name_prefix?: scalar|Param|null, // Default: ""
+ *     }>,
+ *     anonymous_template_directory?: scalar|Param|null, // Defaults to `components`
+ *     profiler?: bool|array{ // Enables the profiler for Twig Component
+ *         enabled?: bool|Param, // Default: "%kernel.debug%"
+ *         collect_components?: bool|Param, // Collect components instances // Default: true
+ *     },
+ *     controllers_json?: scalar|Param|null, // Deprecated: The "twig_component.controllers_json" config option is deprecated, and will be removed in 3.0. // Default: null
+ * }
+ * @psalm-type FlasherConfig = array{
+ *     default?: scalar|Param|null, // Default notification library (e.g., "flasher", "toastr", "noty", "notyf", "sweetalert") // Default: "flasher"
+ *     main_script?: scalar|Param|null, // Path to the main PHPFlasher JavaScript file // Default: "/vendor/flasher/flasher.min.js"
+ *     public_path?: scalar|Param|null, // Prefix prepended to every flasher asset URL. Useful when the app is served from a subdirectory (e.g. "/Symfony") or a separate asset host (e.g. "https://cdn.example.com"). Defaults to "". // Default: ""
+ *     inject_assets?: bool|Param, // Automatically inject assets into HTML pages // Default: true
+ *     translate?: bool|Param, // Enable message translation // Default: true
+ *     excluded_paths?: list<scalar|Param|null>,
+ *     filter?: list<mixed>,
+ *     scripts?: list<scalar|Param|null>,
+ *     styles?: list<scalar|Param|null>,
+ *     options?: list<mixed>,
+ *     flash_bag?: mixed, // Map Symfony flash messages to notification types // Default: true
+ *     presets?: array<string, array{ // Default: []
+ *         type?: scalar|Param|null, // Notification type (e.g., "success", "error")
+ *         title?: scalar|Param|null, // Default title
+ *         message?: scalar|Param|null, // Default message
+ *         options?: list<mixed>,
+ *     }>,
+ *     plugins?: array<string, array{ // Default: []
+ *         view?: scalar|Param|null, // Custom twig view template
+ *         styles?: list<scalar|Param|null>,
+ *         scripts?: list<scalar|Param|null>,
+ *         options?: list<mixed>,
+ *     }>,
+ *     themes?: array<string, array{ // Default: []
+ *         styles?: list<scalar|Param|null>,
+ *         scripts?: list<scalar|Param|null>,
+ *         options?: list<mixed>,
+ *     }>,
+ * }
  * @psalm-type ConfigType = array{
  *     imports?: ImportsConfig,
  *     parameters?: ParametersConfig,
@@ -1468,6 +1510,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     twig_extra?: TwigExtraConfig,
  *     security?: SecurityConfig,
  *     monolog?: MonologConfig,
+ *     twig_component?: TwigComponentConfig,
+ *     flasher?: FlasherConfig,
  *     "when@dev"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,
@@ -1484,6 +1528,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         security?: SecurityConfig,
  *         monolog?: MonologConfig,
  *         maker?: MakerConfig,
+ *         twig_component?: TwigComponentConfig,
+ *         flasher?: FlasherConfig,
  *     },
  *     "when@prod"?: array{
  *         imports?: ImportsConfig,
@@ -1498,6 +1544,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         twig_extra?: TwigExtraConfig,
  *         security?: SecurityConfig,
  *         monolog?: MonologConfig,
+ *         twig_component?: TwigComponentConfig,
+ *         flasher?: FlasherConfig,
  *     },
  *     "when@test"?: array{
  *         imports?: ImportsConfig,
@@ -1513,6 +1561,8 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         twig_extra?: TwigExtraConfig,
  *         security?: SecurityConfig,
  *         monolog?: MonologConfig,
+ *         twig_component?: TwigComponentConfig,
+ *         flasher?: FlasherConfig,
  *     },
  *     ...<string, ExtensionType|array{ // extra keys must follow the when@%env% pattern or match an extension alias
  *         imports?: ImportsConfig,

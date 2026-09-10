@@ -71,7 +71,7 @@ class MicrostructureCrudController extends AbstractCrudController
         $added = 0;
         foreach ($items as $item) {
             $filename = $item->getFilename();
-            if (!is_string($filename) || !preg_match('/^[A-Za-z0-9._-]+\.png$/', $filename)) {
+            if (!is_string($filename) || !preg_match(SnapshotController::IMAGE_FILENAME_PATTERN, $filename)) {
                 continue;
             }
             $path = $dir.'/'.$filename;

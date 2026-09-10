@@ -7,6 +7,11 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # Snapshot compression (App\Service\ImageCompressor)
+    app.snapshot.format: 'jpeg'   # webp | jpeg | png
+    app.snapshot.quality: 75      # 0-100; use 101 for lossless WebP (bigger files, no pixel loss)
+    app.snapshot.max_width: 0     # 0 = keep the captured resolution
+    app.snapshot.max_height: 0
 
 services:
     # default configuration for services in *this* file

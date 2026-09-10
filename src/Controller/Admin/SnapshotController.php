@@ -4,6 +4,7 @@ namespace App\Controller\Admin;
 
 use App\Entity\Microstructure;
 use App\Repository\MicrostructureRepository;
+use App\Service\ImageCompressor;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -18,10 +19,16 @@ use Symfony\Component\Validator\Validation;
 
 class SnapshotController extends AbstractController
 {
+    /** Stored snapshot filenames, whatever format the compressor produced. */
+    public const IMAGE_FILENAME_PATTERN = '/^[A-Za-z0-9._-]+\.(?:png|jpe?g|webp)$/';
+
+    private const ROUTE_FILENAME_REQUIREMENT = '[A-Za-z0-9._-]+\.(?:png|jpe?g|webp)';
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly MicrostructureRepository $microstructures,
         private readonly MailerInterface $mailer,
+        private readonly ImageCompressor $compressor,
     ) {
     }
 
@@ -33,11 +40,11 @@ class SnapshotController extends AbstractController
             return $this->json(['error' => 'Missing image'], 400);
         }
 
-        if (!preg_match('#^data:image/png;base64,(.+)$#', $payload['image'], $matches)) {
+        if (!preg_match('#^data:image/(png|jpeg|webp);base64,(.+)$#', $payload['image'], $matches)) {
             return $this->json(['error' => 'Invalid image format'], 400);
         }
 
-        $binary = base64_decode($matches[1], true);
+        $binary = base64_decode($matches[2], true);
         if ($binary === false) {
             return $this->json(['error' => 'Invalid base64'], 400);
         }
@@ -55,13 +62,23 @@ class SnapshotController extends AbstractController
             return $this->json(['error' => 'Cannot create directory'], 500);
         }
 
+        $originalSize = strlen($binary);
+        $compressed = $this->compressor->compress(
+            $binary,
+            $matches[1] === 'jpeg' ? 'jpg' : $matches[1],
+            'image/'.$matches[1],
+        );
+
         $base = sprintf('%s_%s_x%s', $alloy, $position, $magnification);
-        $filename = $base.'.png';
+        $filename = sprintf('%s.%s', $base, $compressed->extension);
         $i = 1;
         while (file_exists($dir.'/'.$filename)) {
-            $filename = sprintf('%s_%d.png', $base, $i++);
+            $filename = sprintf('%s_%d.%s', $base, $i++, $compressed->extension);
         }
-        file_put_contents($dir.'/'.$filename, $binary);
+
+        if (file_put_contents($dir.'/'.$filename, $compressed->bytes) === false) {
+            return $this->json(['error' => 'Cannot write image'], 500);
+        }
 
         $microstructure = (new Microstructure())
             ->setScale($magnification)
@@ -78,7 +95,13 @@ class SnapshotController extends AbstractController
             'ok' => true,
             'filename' => $filename,
             'url' => '/uploads/snapshots/'.$filename,
-            'message' => 'Image saved!'
+            'originalSize' => $originalSize,
+            'size' => $compressed->size(),
+            'message' => sprintf(
+                'Image saved! (%s, %d%% smaller)',
+                strtoupper($compressed->extension),
+                $originalSize > 0 ? (int) round((1 - $compressed->size() / $originalSize) * 100) : 0
+            ),
         ]);
     }
 
@@ -102,7 +125,7 @@ class SnapshotController extends AbstractController
 
         $added = 0;
         foreach ($filenames as $filename) {
-            if (!is_string($filename) || !preg_match('/^[A-Za-z0-9._-]+\.png$/', $filename)) {
+            if (!is_string($filename) || !preg_match(self::IMAGE_FILENAME_PATTERN, $filename)) {
                 continue;
             }
             $path = $dir.'/'.$filename;
@@ -157,7 +180,7 @@ class SnapshotController extends AbstractController
 
         $added = 0;
         foreach ($filenames as $filename) {
-            if (!is_string($filename) || !preg_match('/^[A-Za-z0-9._-]+\.png$/', $filename)) {
+            if (!is_string($filename) || !preg_match(self::IMAGE_FILENAME_PATTERN, $filename)) {
                 continue;
             }
             $path = $dir.'/'.$filename;
@@ -196,7 +219,7 @@ class SnapshotController extends AbstractController
         ]);
     }
 
-    #[Route('/admin/snapshot/{filename}', name: 'admin_snapshot_delete', methods: ['DELETE'], requirements: ['filename' => '[A-Za-z0-9._-]+\.png'])]
+    #[Route('/admin/snapshot/{filename}', name: 'admin_snapshot_delete', methods: ['DELETE'], requirements: ['filename' => self::ROUTE_FILENAME_REQUIREMENT])]
     public function delete(string $filename): JsonResponse
     {
         $path = $this->getParameter('kernel.project_dir').'/public/uploads/snapshots/'.$filename;
