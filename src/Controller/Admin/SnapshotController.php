@@ -40,21 +40,30 @@ class SnapshotController extends AbstractController
             return $this->json(['error' => 'Missing image'], 400);
         }
 
-        if (!preg_match('#^data:image/(png|jpeg|webp);base64,(.+)$#', $payload['image'], $matches)) {
-            return $this->json(['error' => 'Invalid image format'], 400);
-        }
-
-        $binary = base64_decode($matches[2], true);
-        if ($binary === false) {
-            return $this->json(['error' => 'Invalid base64'], 400);
-        }
-
         $sanitize = static fn (string $v): string => preg_replace('/[^A-Za-z0-9]/', '', $v);
 
         $magnification = $sanitize((string) ($payload['magnification'] ?? 'unknown'));
         $alloy = $sanitize((string) ($payload['alloy'] ?? '')) ?: 'unknown';
         $position = $sanitize((string) ($payload['position'] ?? '')) ?: 'unknown';
         $comment = trim((string) ($payload['comment'] ?? '')) ?: null;
+
+        // A multi-megapixel capture is tens of megabytes of base64, so keep exactly one
+        // reference to it and drop the decoded payload before touching GD.
+        $dataUrl = (string) $payload['image'];
+        unset($payload);
+
+        // Match the prefix only: a `(.+)$` capture would put two more full copies in $matches.
+        if (!preg_match('#^data:image/(png|jpeg|webp);base64,#', $dataUrl, $matches)) {
+            return $this->json(['error' => 'Invalid image format'], 400);
+        }
+
+        $sourceType = $matches[1];
+        $binary = base64_decode(substr($dataUrl, \strlen($matches[0])), true);
+        unset($dataUrl, $matches);
+
+        if ($binary === false) {
+            return $this->json(['error' => 'Invalid base64'], 400);
+        }
 
         $dir = $this->getParameter('kernel.project_dir').'/public/uploads/snapshots';
 
@@ -65,8 +74,8 @@ class SnapshotController extends AbstractController
         $originalSize = strlen($binary);
         $compressed = $this->compressor->compress(
             $binary,
-            $matches[1] === 'jpeg' ? 'jpg' : $matches[1],
-            'image/'.$matches[1],
+            $sourceType === 'jpeg' ? 'jpg' : $sourceType,
+            'image/'.$sourceType,
         );
 
         $base = sprintf('%s_%s_x%s', $alloy, $position, $magnification);

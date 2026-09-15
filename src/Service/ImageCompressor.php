@@ -54,6 +54,19 @@ final class ImageCompressor
         }
 
         $format = $this->resolveFormat();
+
+        if ($format === 'jpeg') {
+            // JPEG has no alpha channel: flatten transparency onto white first.
+            $flattened = $this->flatten($image);
+            if ($flattened !== $image) {
+                // Free the source right away: holding both costs width * height * 4 bytes twice.
+                imagedestroy($image);
+                $image = $flattened;
+            }
+        } elseif (!imageistruecolor($image)) {
+            imagepalettetotruecolor($image);
+        }
+
         $encoded = $this->encode($image, $format);
         imagedestroy($image);
 
@@ -107,30 +120,18 @@ final class ImageCompressor
 
     private function encode(\GdImage $image, string $format): ?string
     {
-        $target = $image;
-        if ($format === 'jpeg') {
-            // JPEG has no alpha channel: flatten transparency onto white first.
-            $target = $this->flatten($image);
-        } elseif (!imageistruecolor($image)) {
-            imagepalettetotruecolor($image);
-        }
-
         if ($format !== 'jpeg') {
-            imagealphablending($target, false);
-            imagesavealpha($target, true);
+            imagealphablending($image, false);
+            imagesavealpha($image, true);
         }
 
         ob_start();
         $ok = match ($format) {
-            'webp' => imagewebp($target, null, $this->webpQuality()),
-            'jpeg' => imagejpeg($target, null, $this->clamp($this->quality, 0, 100)),
-            'png' => imagepng($target, null, 9),
+            'webp' => imagewebp($image, null, $this->webpQuality()),
+            'jpeg' => imagejpeg($image, null, $this->clamp($this->quality, 0, 100)),
+            'png' => imagepng($image, null, 9),
         };
         $bytes = ob_get_clean();
-
-        if ($target !== $image) {
-            imagedestroy($target);
-        }
 
         if (!$ok || !is_string($bytes) || $bytes === '') {
             $this->logger?->warning('Snapshot compression failed while encoding to {format}.', ['format' => $format]);
@@ -143,13 +144,23 @@ final class ImageCompressor
 
     private function flatten(\GdImage $image): \GdImage
     {
-        $flattened = imagecreatetruecolor(imagesx($image), imagesy($image));
+        $width = imagesx($image);
+        $height = imagesy($image);
+
+        $flattened = imagecreatetruecolor($width, $height);
         if ($flattened === false) {
             return $image;
         }
 
-        imagefill($flattened, 0, 0, imagecolorallocate($flattened, 255, 255, 255));
-        imagecopy($flattened, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
+        // Never imagefill() here: the flood fill allocates a scratch stack of
+        // width * height * 4 bytes (22 MB for a 2720x2048 capture) and exhausts memory_limit.
+        // On a blank canvas a filled rectangle gives the same result and allocates nothing.
+        imagealphablending($flattened, false);
+        imagefilledrectangle($flattened, 0, 0, $width - 1, $height - 1, imagecolorallocate($flattened, 255, 255, 255));
+
+        // Blending back on so the source alpha is composited onto the white background.
+        imagealphablending($flattened, true);
+        imagecopy($flattened, $image, 0, 0, 0, 0, $width, $height);
 
         return $flattened;
     }
